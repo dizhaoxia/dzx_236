@@ -41,15 +41,23 @@ def update_daily_record(user_id, is_new, is_mastered=False):
     today = date.today()
     record = DailyRecord.query.filter_by(user_id=user_id, date=today).first()
     if not record:
-        record = DailyRecord(user_id=user_id, date=today)
+        record = DailyRecord(
+            user_id=user_id,
+            date=today,
+            total_count=0,
+            new_count=0,
+            review_count=0,
+            mastered_count=0
+        )
         db.session.add(record)
-    record.total_count += 1
+        db.session.flush()
+    record.total_count = (record.total_count or 0) + 1
     if is_new:
-        record.new_count += 1
+        record.new_count = (record.new_count or 0) + 1
     else:
-        record.review_count += 1
+        record.review_count = (record.review_count or 0) + 1
     if is_mastered:
-        record.mastered_count += 1
+        record.mastered_count = (record.mastered_count or 0) + 1
     db.session.commit()
 
 @study_bp.route('/queue', methods=['GET'])
@@ -69,8 +77,8 @@ def get_queue():
     review_uws = UserWord.query.filter(
         UserWord.user_id == user_id,
         UserWord.next_review <= today,
-        UserWord.status.in_(['learning', 'mastered'])
-    ).order_by(UserWord.next_review.asc()).all()
+        UserWord.status.in_(['learning', 'mastered', 'new'])
+    ).order_by(UserWord.status.asc(), UserWord.next_review.asc()).all()
 
     new_word_ids_in_user = [uw.word_id for uw in UserWord.query.filter_by(user_id=user_id).all()]
     available_word_ids = [vw.word_id for vw in VocabWord.query.filter(VocabWord.vocab_book_id.in_(vocab_ids)).all()] if vocab_ids else []
@@ -95,7 +103,7 @@ def get_queue():
         new_user_words.append(uw)
 
     if new_user_words:
-        db.session.flush()
+        db.session.commit()
 
     all_uws = list(review_uws) + new_user_words
     result = [serialize_word_learning(uw) for uw in all_uws]
