@@ -28,6 +28,19 @@ def create_database():
     except Exception as e:
         print(f"Database init warning: {e}")
 
+def migrate_database():
+    try:
+        from models import db, User
+        from sqlalchemy import text
+        with db.engine.connect() as conn:
+            result = conn.execute(text("SHOW COLUMNS FROM users LIKE 'study_mode'"))
+            if not result.fetchone():
+                conn.execute(text("ALTER TABLE users ADD COLUMN study_mode VARCHAR(20) DEFAULT 'card'"))
+                conn.commit()
+                print('Migrated: added study_mode column to users table')
+    except Exception as e:
+        print(f'Migration check warning: {e}')
+
 def create_app():
     create_database()
     app = Flask(__name__)
@@ -38,6 +51,7 @@ def create_app():
     with app.app_context():
         from models import User, Word, UserWord, VocabBook, UserVocabBook, DailyRecord, VocabWord
         db.create_all()
+        migrate_database()
         from init_data import init_vocab_books
         init_vocab_books()
 

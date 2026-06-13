@@ -36,7 +36,8 @@ def register():
                 'id': user.id,
                 'email': user.email,
                 'nickname': user.nickname,
-                'daily_goal': user.daily_goal
+                'daily_goal': user.daily_goal,
+                'study_mode': user.study_mode
             }
         }
     })
@@ -63,7 +64,8 @@ def login():
                 'id': user.id,
                 'email': user.email,
                 'nickname': user.nickname,
-                'daily_goal': user.daily_goal
+                'daily_goal': user.daily_goal,
+                'study_mode': user.study_mode
             }
         }
     })
@@ -109,6 +111,7 @@ def profile():
                 'email': user.email,
                 'nickname': user.nickname,
                 'daily_goal': user.daily_goal,
+                'study_mode': user.study_mode,
                 'created_at': user.created_at.strftime('%Y-%m-%d')
             },
             'stats': {
@@ -141,6 +144,12 @@ def update_profile():
             user.daily_goal = goal
         else:
             return jsonify({'code': 400, 'message': '每日目标只能是10/20/50'})
+    if 'study_mode' in data:
+        mode = data['study_mode']
+        if mode in ['card', 'spelling']:
+            user.study_mode = mode
+        else:
+            return jsonify({'code': 400, 'message': '学习模式只能是card/spelling'})
     if 'password' in data and data['password']:
         if len(data['password']) < 6:
             return jsonify({'code': 400, 'message': '密码至少6位'})
@@ -153,6 +162,7 @@ def update_profile():
         'data': {
             'id': user.id,
             'nickname': user.nickname,
-            'daily_goal': user.daily_goal
+            'daily_goal': user.daily_goal,
+            'study_mode': user.study_mode
         }
     })

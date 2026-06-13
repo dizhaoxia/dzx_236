@@ -10,6 +10,7 @@ class User(db.Model):
     password = db.Column(db.String(256), nullable=False)
     nickname = db.Column(db.String(50), default='学习者')
     daily_goal = db.Column(db.Integer, default=20)
+    study_mode = db.Column(db.String(20), default='card')
     created_at = db.Column(db.DateTime, default=datetime.now)
     user_words = db.relationship('UserWord', backref='user', lazy=True)
     daily_records = db.relationship('DailyRecord', backref='user', lazy=True)

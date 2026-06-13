@@ -68,7 +68,7 @@
               @click="selectWord(idx)"
             >
               <span class="queue-idx">{{ doneIndices.has(idx) ? '✓' : idx + 1 }}</span>
-              <span class="queue-word">{{ w.word }}</span>
+              <span class="queue-word">{{ studyMode === 'spelling' && !doneIndices.has(idx) ? maskWord(w.word) : w.word }}</span>
               <span v-if="!w.is_review && !doneIndices.has(idx)" class="badge badge-warning" style="margin-left:auto">新</span>
               <span v-if="w.is_review && !doneIndices.has(idx)" class="badge badge-info" style="margin-left:auto">复</span>
             </div>
@@ -77,71 +77,138 @@
       </div>
 
       <div class="study-main">
-        <div class="word-card" :class="{ flipped: showAnswer }">
-          <div v-show="!showAnswer" class="word-face word-front">
-            <div class="word-tag" :class="currentWord?.is_review ? 'tag-review' : 'tag-new'">
-              {{ currentWord?.is_review ? '🔄 复习' : '🆕 新词' }}
+        <template v-if="studyMode === 'card'">
+          <div class="word-card" :class="{ flipped: showAnswer }">
+            <div v-show="!showAnswer" class="word-face word-front">
+              <div class="word-tag" :class="currentWord?.is_review ? 'tag-review' : 'tag-new'">
+                {{ currentWord?.is_review ? '🔄 复习' : '🆕 新词' }}
+              </div>
+              <div class="word-title">{{ currentWord?.word }}</div>
+              <div v-if="currentWord?.phonetic" class="word-phonetic">
+                {{ currentWord.phonetic }}
+                <button class="speak-btn" @click.stop="speakWord" title="朗读">🔊</button>
+              </div>
+              <button class="btn btn-outline btn-lg reveal-btn" @click.stop="showAnswer = true">
+                查看释义
+              </button>
             </div>
-            <div class="word-title">{{ currentWord?.word }}</div>
-            <div v-if="currentWord?.phonetic" class="word-phonetic">
-              {{ currentWord.phonetic }}
-              <button class="speak-btn" @click.stop="speakWord" title="朗读">🔊</button>
+            <div v-show="showAnswer" class="word-face word-back">
+              <div class="word-tag" :class="currentWord?.is_review ? 'tag-review' : 'tag-new'">
+                {{ currentWord?.is_review ? '🔄 复习' : '🆕 新词' }}
+              </div>
+              <div class="word-title">{{ currentWord?.word }}</div>
+              <div v-if="currentWord?.phonetic" class="word-phonetic">
+                {{ currentWord.phonetic }}
+                <button class="speak-btn" @click.stop="speakWord" title="朗读">🔊</button>
+              </div>
+              <div class="word-section">
+                <div class="section-label">📝 释义</div>
+                <div class="section-content meaning">{{ currentWord?.meaning }}</div>
+              </div>
+              <div v-if="currentWord?.example" class="word-section">
+                <div class="section-label">💬 例句</div>
+                <div class="section-content example">{{ currentWord?.example }}</div>
+                <div v-if="currentWord?.example_trans" class="section-content example-trans">
+                  {{ currentWord.example_trans }}
+                </div>
+              </div>
             </div>
-            <button class="btn btn-outline btn-lg reveal-btn" @click.stop="showAnswer = true">
-              查看释义
+          </div>
+
+          <div v-if="showAnswer" class="action-buttons">
+            <button class="action-btn btn-unknown" @click.stop="handleReview(0)" :disabled="reviewing">
+              <span class="action-icon">❌</span>
+              <span class="action-text">{{ reviewing ? '处理中...' : '不认识' }}</span>
+              <span class="action-hint">重新学习</span>
+            </button>
+            <button class="action-btn btn-vague" @click.stop="handleReview(1)" :disabled="reviewing">
+              <span class="action-icon">🤔</span>
+              <span class="action-text">{{ reviewing ? '处理中...' : '模糊' }}</span>
+              <span class="action-hint">适当延后</span>
+            </button>
+            <button class="action-btn btn-know" @click.stop="handleReview(2)" :disabled="reviewing">
+              <span class="action-icon">✅</span>
+              <span class="action-text">{{ reviewing ? '处理中...' : '认识' }}</span>
+              <span class="action-hint">按算法延后</span>
             </button>
           </div>
-          <div v-show="showAnswer" class="word-face word-back">
+
+          <div v-if="!showAnswer" class="hint-text">
+            💡 请尝试回忆单词含义，然后点击查看释义
+          </div>
+        </template>
+
+        <template v-else>
+          <div class="word-card spelling-card" :class="{ 'spelling-correct': spellingResult === 'correct', 'spelling-wrong': spellingResult === 'wrong' }">
             <div class="word-tag" :class="currentWord?.is_review ? 'tag-review' : 'tag-new'">
               {{ currentWord?.is_review ? '🔄 复习' : '🆕 新词' }}
             </div>
-            <div class="word-title">{{ currentWord?.word }}</div>
-            <div v-if="currentWord?.phonetic" class="word-phonetic">
-              {{ currentWord.phonetic }}
-              <button class="speak-btn" @click.stop="speakWord" title="朗读">🔊</button>
+            <div class="spelling-section">
+              <div class="section-label">📝 中文释义</div>
+              <div class="section-content meaning spelling-meaning">{{ currentWord?.meaning }}</div>
             </div>
-            <div class="word-section">
-              <div class="section-label">📝 释义</div>
-              <div class="section-content meaning">{{ currentWord?.meaning }}</div>
-            </div>
-            <div v-if="currentWord?.example" class="word-section">
+            <div v-if="currentWord?.example" class="spelling-section">
               <div class="section-label">💬 例句</div>
               <div class="section-content example">{{ currentWord?.example }}</div>
               <div v-if="currentWord?.example_trans" class="section-content example-trans">
                 {{ currentWord.example_trans }}
               </div>
             </div>
+            <div class="spelling-input-wrap">
+              <input
+                ref="spellingInputRef"
+                v-model="spellingInput"
+                type="text"
+                class="spelling-input"
+                :class="{ 'input-correct': spellingResult === 'correct', 'input-wrong': spellingResult === 'wrong' }"
+                placeholder="请输入英文单词..."
+                @keyup.enter="checkSpelling"
+                :disabled="spellingResult !== null"
+                autocomplete="off"
+                autocapitalize="off"
+                spellcheck="false"
+              />
+              <button v-if="!spellingResult" class="btn btn-primary spelling-submit-btn" @click.stop="checkSpelling" :disabled="reviewing">
+                提交
+              </button>
+            </div>
+            <div v-if="spellingResult === 'wrong'" class="spelling-answer">
+              <div class="answer-label">正确答案</div>
+              <div class="answer-word">{{ currentWord?.word }}</div>
+              <div v-if="currentWord?.phonetic" class="answer-phonetic">
+                {{ currentWord.phonetic }}
+                <button class="speak-btn" @click.stop="speakWord" title="朗读">🔊</button>
+              </div>
+            </div>
+            <div v-if="spellingResult === 'correct'" class="spelling-feedback correct-feedback">
+              ✅ 回答正确！
+            </div>
           </div>
-        </div>
 
-        <div v-if="showAnswer" class="action-buttons">
-          <button class="action-btn btn-unknown" @click.stop="handleReview(0)" :disabled="reviewing">
-            <span class="action-icon">❌</span>
-            <span class="action-text">{{ reviewing ? '处理中...' : '不认识' }}</span>
-            <span class="action-hint">重新学习</span>
-          </button>
-          <button class="action-btn btn-vague" @click.stop="handleReview(1)" :disabled="reviewing">
-            <span class="action-icon">🤔</span>
-            <span class="action-text">{{ reviewing ? '处理中...' : '模糊' }}</span>
-            <span class="action-hint">适当延后</span>
-          </button>
-          <button class="action-btn btn-know" @click.stop="handleReview(2)" :disabled="reviewing">
-            <span class="action-icon">✅</span>
-            <span class="action-text">{{ reviewing ? '处理中...' : '认识' }}</span>
-            <span class="action-hint">按算法延后</span>
-          </button>
-        </div>
+          <div v-if="spellingResult" class="spelling-actions">
+            <button v-if="spellingResult === 'wrong'" class="action-btn btn-unknown" @click.stop="handleSpellingReview(0)" :disabled="reviewing">
+              <span class="action-icon">❌</span>
+              <span class="action-text">{{ reviewing ? '处理中...' : '不认识' }}</span>
+              <span class="action-hint">重新学习</span>
+            </button>
+            <button v-else class="action-btn btn-know" @click.stop="handleSpellingReview(2)" :disabled="reviewing">
+              <span class="action-icon">✅</span>
+              <span class="action-text">{{ reviewing ? '处理中...' : '认识' }}</span>
+              <span class="action-hint">按算法延后</span>
+            </button>
+          </div>
 
-        <div v-if="!showAnswer" class="hint-text">
-          💡 请尝试回忆单词含义，然后点击查看释义
-        </div>
+          <div v-if="!spellingResult" class="hint-text">
+            💡 根据中文释义拼写英文单词，按回车或点击提交
+          </div>
+        </template>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useToastStore } from '@/stores/toast'
 import { useUserStore } from '@/stores/user'
 import api from '@/utils/api'
@@ -157,6 +224,11 @@ const completedCount = ref(0)
 const queueInfo = ref({})
 const doneIndices = ref(new Set())
 
+const spellingInput = ref('')
+const spellingResult = ref(null)
+const spellingInputRef = ref(null)
+
+const studyMode = computed(() => userStore.studyMode || 'card')
 const currentWord = computed(() => queue.value[currentIndex.value] || null)
 const newCount = computed(() => queue.value.filter(w => !w.is_review).length)
 const reviewCount = computed(() => queue.value.filter(w => w.is_review).length)
@@ -231,7 +303,82 @@ const handleReview = async (quality) => {
   }
 }
 
+const checkSpelling = () => {
+  if (!currentWord.value || spellingResult.value !== null) return
+  const userInput = spellingInput.value.trim().toLowerCase()
+  const correctAnswer = currentWord.value.word.trim().toLowerCase()
+  if (!userInput) {
+    toast.warning('请输入单词')
+    return
+  }
+  if (userInput === correctAnswer) {
+    spellingResult.value = 'correct'
+    setTimeout(() => handleSpellingReview(2), 600)
+  } else {
+    spellingResult.value = 'wrong'
+  }
+}
+
+const handleSpellingReview = async (quality) => {
+  if (!currentWord.value || reviewing.value) return
+  reviewing.value = true
+  try {
+    const res = await api.post('/study/review', {
+      user_word_id: currentWord.value.user_word_id,
+      quality
+    })
+    if (res.code === 200) {
+      const labels = ['重新学习', '延后复习', '安排下次复习']
+      toast.success(`已${labels[quality]}：${currentWord.value.word}`)
+      doneIndices.value.add(currentIndex.value)
+      completedCount.value++
+      await nextTick()
+      let nextIdx = currentIndex.value + 1
+      while (nextIdx < queue.value.length && doneIndices.value.has(nextIdx)) {
+        nextIdx++
+      }
+      if (nextIdx < queue.value.length) {
+        currentIndex.value = nextIdx
+      } else {
+        setTimeout(() => {
+          toast.success('🎉 太棒了！本轮学习完成！')
+        }, 300)
+      }
+    } else {
+      toast.error(res.message || '操作失败')
+    }
+  } catch (e) {
+    console.error('handleSpellingReview error:', e)
+    toast.error(e?.message || '操作失败，请重试')
+  } finally {
+    reviewing.value = false
+  }
+}
+
+const resetSpellingState = () => {
+  spellingInput.value = ''
+  spellingResult.value = null
+  nextTick(() => {
+    if (studyMode.value === 'spelling' && spellingInputRef.value) {
+      spellingInputRef.value.focus()
+    }
+  })
+}
+
 onMounted(loadQueue)
+
+watch(currentIndex, () => {
+  if (studyMode.value === 'spelling') {
+    resetSpellingState()
+  }
+})
+
+const maskWord = (word) => {
+  if (!word) return ''
+  const len = word.length
+  if (len <= 2) return '_'.repeat(len)
+  return word[0] + '_'.repeat(len - 2) + word[len - 1]
+}
 
 const selectWord = (idx) => {
   if (idx < 0 || idx >= queue.value.length) return
@@ -239,6 +386,13 @@ const selectWord = (idx) => {
   currentIndex.value = idx
   showAnswer.value = false
 }
+
+watch(studyMode, () => {
+  if (studyMode.value === 'spelling') {
+    resetSpellingState()
+  }
+  showAnswer.value = false
+})
 </script>
 
 <style scoped>
@@ -344,6 +498,100 @@ const selectWord = (idx) => {
 .action-hint { font-size: 12px; opacity: 0.9; font-weight: 400; }
 
 .hint-text { text-align: center; margin-top: 20px; color: var(--text-secondary); font-size: 14px; }
+
+.spelling-card { min-height: 480px; justify-content: flex-start; padding-top: 60px;
+}
+.spelling-section { width: 100%; margin-top: 16px; text-align: left; }
+.spelling-meaning { font-size: 20px; line-height: 1.6; }
+.spelling-input-wrap {
+  width: 100%;
+  margin-top: 28px;
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+.spelling-input {
+  flex: 1;
+  padding: 14px 18px;
+  font-size: 18px;
+  border: 2px solid #e5e7eb;
+  border-radius: var(--radius);
+  outline: none;
+  transition: all 0.2s;
+  background: #f9fafb;
+}
+.spelling-input:focus {
+  border-color: var(--primary);
+  background: white;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+.spelling-input.input-correct {
+  border-color: #10b981;
+  background: #ecfdf5;
+  color: #065f46;
+}
+.spelling-input.input-wrong {
+  border-color: #ef4444;
+  background: #fef2f2;
+  color: #991b1b;
+}
+.spelling-submit-btn {
+  padding: 0 28px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.spelling-answer {
+  width: 100%;
+  margin-top: 24px;
+  padding: 20px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius);
+  text-align: center;
+}
+.answer-label {
+  font-size: 13px;
+  color: #ef4444;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.answer-word {
+  font-size: 32px;
+  font-weight: 800;
+  color: #991b1b;
+  margin-bottom: 8px;
+}
+.answer-phonetic {
+  font-size: 16px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.spelling-feedback {
+  width: 100%;
+  margin-top: 24px;
+  padding: 20px;
+  border-radius: var(--radius);
+  text-align: center;
+  font-size: 18px;
+  font-weight: 600;
+}
+.correct-feedback {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+.spelling-card.spelling-correct {
+  border-color: #10b981;
+  background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%);
+}
+.spelling-card.spelling-wrong {
+  border-color: #ef4444;
+  background: linear-gradient(135deg, #ffffff 0%, #fef2f2 100%);
+}
+.spelling-actions { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 24px; position: relative; z-index: 10; }
 
 @media (max-width: 900px) {
   .study-layout { grid-template-columns: 1fr; }

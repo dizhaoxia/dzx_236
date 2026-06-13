@@ -10,7 +10,8 @@ export const useUserStore = defineStore('user', {
   getters: {
     isLoggedIn: state => !!state.token,
     nickname: state => state.user?.nickname || '',
-    dailyGoal: state => state.user?.daily_goal || 20
+    dailyGoal: state => state.user?.daily_goal || 20,
+    studyMode: state => state.user?.study_mode || 'card'
   },
   actions: {
     async login(email, password) {

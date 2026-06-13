@@ -93,6 +93,27 @@
         </div>
 
         <div class="settings-section">
+          <div class="section-label">学习模式</div>
+          <div class="mode-options">
+            <div
+              v-for="m in modeOptions"
+              :key="m.value"
+              class="mode-option"
+              :class="{ active: form.study_mode === m.value }"
+              @click="form.study_mode = m.value"
+            >
+              <div class="mode-icon">{{ m.icon }}</div>
+              <div class="mode-name">{{ m.name }}</div>
+              <div class="mode-desc">{{ m.desc }}</div>
+              <div class="mode-check" v-if="form.study_mode === m.value">✓</div>
+            </div>
+          </div>
+          <button class="btn btn-primary" style="margin-top: 12px" @click="saveStudyMode" :disabled="savingMode">
+            {{ savingMode ? '保存中...' : '保存模式' }}
+          </button>
+        </div>
+
+        <div class="settings-section">
           <div class="section-label">修改密码</div>
           <div class="form-group">
             <label class="form-label">新密码（至少6位）</label>
@@ -122,18 +143,25 @@ const toast = useToastStore()
 const form = reactive({
   nickname: userStore.nickname,
   daily_goal: userStore.dailyGoal,
+  study_mode: userStore.studyMode,
   password: '',
   confirmPassword: ''
 })
 
 const saving = ref(false)
 const savingGoal = ref(false)
+const savingMode = ref(false)
 const savingPwd = ref(false)
 
 const goalOptions = [
   { value: 10, desc: '轻松入门，适合碎片化学习' },
   { value: 20, desc: '适中节奏，稳步提升' },
   { value: 50, desc: '高强度备考，快速突破' }
+]
+
+const modeOptions = [
+  { value: 'card', name: '卡片模式', icon: '🃏', desc: '看英文回忆中文释义' },
+  { value: 'spelling', name: '拼写模式', icon: '⌨️', desc: '看中文拼写英文单词' }
 ]
 
 const avatarText = computed(() => {
@@ -174,6 +202,23 @@ const saveGoal = async () => {
     toast.error(e?.message || '修改失败')
   } finally {
     savingGoal.value = false
+  }
+}
+
+const saveStudyMode = async () => {
+  savingMode.value = true
+  try {
+    const res = await userStore.updateProfile({ study_mode: form.study_mode })
+    if (res.code === 200) {
+      const modeLabel = modeOptions.find(m => m.value === form.study_mode)?.name || form.study_mode
+      toast.success(`学习模式已切换为 ${modeLabel}`)
+    } else {
+      toast.error(res.message || '修改失败')
+    }
+  } catch (e) {
+    toast.error(e?.message || '修改失败')
+  } finally {
+    savingMode.value = false
   }
 }
 
@@ -320,6 +365,47 @@ onMounted(() => {
 .goal-option.active .goal-value { color: var(--primary); }
 .goal-desc { font-size: 11px; color: var(--text-secondary); line-height: 1.4; }
 .goal-check {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: white;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.mode-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.mode-option {
+  position: relative;
+  padding: 20px 16px;
+  background: #f9fafb;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s;
+}
+.mode-option:hover { background: #f3f4f6; }
+.mode-option.active {
+  background: #eef2ff;
+  border-color: var(--primary);
+}
+.mode-icon { font-size: 32px; margin-bottom: 8px; }
+.mode-name { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.mode-option.active .mode-name { color: var(--primary); }
+.mode-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.4; }
+.mode-check {
   position: absolute;
   top: 8px;
   right: 10px;
