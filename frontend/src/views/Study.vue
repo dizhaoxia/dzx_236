@@ -68,7 +68,7 @@
               @click="selectWord(idx)"
             >
               <span class="queue-idx">{{ doneIndices.has(idx) ? '✓' : idx + 1 }}</span>
-              <span class="queue-word">{{ studyMode === 'spelling' && !doneIndices.has(idx) ? maskWord(w.word) : w.word }}</span>
+              <span class="queue-word">{{ w.word }}</span>
               <span v-if="!w.is_review && !doneIndices.has(idx)" class="badge badge-warning" style="margin-left:auto">新</span>
               <span v-if="w.is_review && !doneIndices.has(idx)" class="badge badge-info" style="margin-left:auto">复</span>
             </div>
@@ -313,7 +313,6 @@ const checkSpelling = () => {
   }
   if (userInput === correctAnswer) {
     spellingResult.value = 'correct'
-    setTimeout(() => handleSpellingReview(2), 600)
   } else {
     spellingResult.value = 'wrong'
   }
@@ -365,34 +364,45 @@ const resetSpellingState = () => {
   })
 }
 
-onMounted(loadQueue)
+const resetCardState = () => {
+  showAnswer.value = false
+}
+
+onMounted(() => {
+  loadQueue()
+  nextTick(() => {
+    if (studyMode.value === 'spelling' && spellingInputRef.value) {
+      spellingInputRef.value.focus()
+    }
+  })
+})
 
 watch(currentIndex, () => {
   if (studyMode.value === 'spelling') {
     resetSpellingState()
+  } else {
+    resetCardState()
   }
 })
 
-const maskWord = (word) => {
-  if (!word) return ''
-  const len = word.length
-  if (len <= 2) return '_'.repeat(len)
-  return word[0] + '_'.repeat(len - 2) + word[len - 1]
-}
+watch(studyMode, () => {
+  if (studyMode.value === 'spelling') {
+    resetSpellingState()
+  } else {
+    resetCardState()
+  }
+})
 
 const selectWord = (idx) => {
   if (idx < 0 || idx >= queue.value.length) return
   if (idx === currentIndex.value) return
   currentIndex.value = idx
-  showAnswer.value = false
-}
-
-watch(studyMode, () => {
   if (studyMode.value === 'spelling') {
     resetSpellingState()
+  } else {
+    resetCardState()
   }
-  showAnswer.value = false
-})
+}
 </script>
 
 <style scoped>
